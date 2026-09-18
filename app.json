@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Remote TV",
+    "slug": "remote-tv",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "remotetv",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B10",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "it.eri.remotetv",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B10",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-dev-client"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "851d339a-e6cd-4c07-a5ad-4e95cb5adcb3"
+      }
+    },
+    "owner": "dilavermusa.9"
+  }
+}
