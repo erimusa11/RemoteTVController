@@ -1,4 +1,4 @@
-import { NativeEventEmitter, NativeModules } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
 
 import { StateEmitter } from './emitter';
 import simulated from './remote.web';
@@ -8,15 +8,15 @@ import type { AtvRemote, KeyPressKind, TvDevice, TvState } from './types';
  * Bridge to the Kotlin module in `modules/atv-remote`, which owns the client
  * certificate and the two TLS sockets (pairing on :6467, remote on :6466).
  *
- * When the module isn't in the binary — Expo Go, or before the first dev build —
- * we fall back to the simulator so the UI still runs on the phone.
+ * When the module isn't in the binary — Expo Go, or a build made before the
+ * module existed — we fall back to the simulator so the UI still runs. The
+ * connect screen reads `isReal` to warn that the listed TVs are fake.
  *
  * SECURITY: the native side of this bridge is the one place a shortcut turns
- * into a LAN-wide MITM hole — see ../../SECURITY.md before implementing it.
- * In short: certificate-pin the TV on first pairing (TOFU) and reject any
- * later handshake that presents a different certificate; keep the client
- * keypair in Android Keystore, never in JS-reachable storage; never log
- * pairing codes, certs, or key material.
+ * into a LAN-wide MITM hole — see ../../SECURITY.md. In short: certificate-pin
+ * the TV on first pairing (TOFU) and reject any later handshake presenting a
+ * different certificate; keep the client keypair in Android Keystore; never
+ * log pairing codes, certs, or key material.
  */
 
 type NativeAtvRemote = {
@@ -31,16 +31,25 @@ type NativeAtvRemote = {
   launchApp(uri: string): Promise<void>;
   hasPairing(deviceId: string): Promise<boolean>;
   forgetPairing(deviceId: string): Promise<void>;
+  addListener(event: 'onState', listener: (patch: Partial<TvState>) => void): { remove(): void };
+  addListener(event: 'onDevice', listener: (device: TvDevice) => void): { remove(): void };
 };
 
-const native: NativeAtvRemote | undefined = NativeModules.AtvRemote;
+const native = requireOptionalNativeModule<NativeAtvRemote>('AtvRemote');
 
-/** Mirrors RemoteDirection in the protocol: START_LONG / END_LONG / SHORT. */
+/** Mirrors RemoteDirection in remotemessage.proto. */
 const DIRECTION: Record<KeyPressKind, number> = {
   'long-start': 1,
   'long-end': 2,
   short: 3,
 };
+
+/**
+ * mDNS answers trickle in, so a scan is a window rather than a request with
+ * a reply. Long enough for a TV that's slow to respond, short enough that the
+ * spinner doesn't feel stuck.
+ */
+const SCAN_WINDOW_MS = 8000;
 
 class NativeRemote implements AtvRemote {
   readonly isReal = true;
@@ -48,19 +57,17 @@ class NativeRemote implements AtvRemote {
   private emitter = new StateEmitter();
 
   constructor(private readonly mod: NativeAtvRemote) {
-    const events = new NativeEventEmitter(NativeModules.AtvRemote);
-    events.addListener('AtvRemote:state', (patch: Partial<TvState>) =>
-      this.emitter.emit(patch),
-    );
+    this.mod.addListener('onState', (patch) => this.emitter.emit(patch));
   }
 
   async discover(onFound: (device: TvDevice) => void) {
-    const events = new NativeEventEmitter(NativeModules.AtvRemote);
-    const sub = events.addListener('AtvRemote:device', onFound);
+    const sub = this.mod.addListener('onDevice', onFound);
     try {
       await this.mod.discover();
+      await new Promise((resolve) => setTimeout(resolve, SCAN_WINDOW_MS));
     } finally {
       sub.remove();
+      await this.mod.stopDiscovery().catch(() => {});
     }
   }
 

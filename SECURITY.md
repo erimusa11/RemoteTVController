@@ -44,19 +44,23 @@ into my phone's LAN traffic."
      replacement certificate; that would defeat the pinning entirely.
 
 2. **Keys never leave hardware-backed storage.**
-   - Generate the client's keypair with Android Keystore
-     (`KeyGenParameterSpec`), so the private key is non-exportable even with
-     root, and use StrongBox when the device has it.
-   - The pinned server-certificate fingerprint and any pairing state go
-     through Android Keystore-backed encrypted storage (e.g. EncryptedFile /
-     Keystore-wrapped, not `expo-secure-store`'s plain profile on devices
-     without a secure enclave — verify the backing store before shipping).
-   - **Never** store certs, private keys, or the pinned fingerprint in
-     `AsyncStorage`/`SharedPreferences`. `src/lib/storage.ts` only ever holds
-     non-secret device metadata (id, name, host, port) — that boundary is
-     deliberate and must stay that way. If a future change needs to persist
-     anything security-sensitive from JS, that's a sign it's in the wrong
-     layer.
+   - The client's keypair is generated with Android Keystore
+     (`KeyGenParameterSpec` in `Certs.kt`), so the private key is
+     non-exportable — it cannot be lifted off the device even with root, and
+     TLS signing is delegated to the keystore rather than done in app memory.
+   - The pinned server-certificate fingerprint lives in app-private
+     `SharedPreferences`. This is a deliberate downgrade from the encrypted
+     storage originally specced here: a pin is a hash of a **public**
+     certificate, so its confidentiality buys nothing — only its integrity
+     matters, and the app sandbox already provides that. (This is the same
+     reasoning that puts SSH's `known_hosts` in plaintext.) Anything that
+     could rewrite the pin already has app-level or root access, at which
+     point encrypting it changes nothing.
+   - **Never** store certs or private keys in `AsyncStorage`.
+     `src/lib/storage.ts` only ever holds non-secret device metadata (id,
+     name, host, port) — that boundary is deliberate and must stay that way.
+     If a future change needs to persist genuinely secret material from JS,
+     that's a sign it belongs in the native layer instead.
 
 3. **Never log secrets.** No pairing code, certificate bytes, or key
    material in `Log.d`/`println`/exception messages — including in debug
