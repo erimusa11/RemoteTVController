@@ -1,0 +1,16 @@
+<!--
+  Adaptive-icon foreground. Android masks this to a circle/squircle/rounded
+  square depending on launcher, and only the centre ~66% is guaranteed
+  visible — the viewBox is padded so the whole mark sits inside that safe
+  zone rather than getting its antennas clipped.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -11 130 130" width="1024" height="1024">
+  <line x1="50" y1="44" x2="31" y2="19" stroke="#B00D1E" stroke-width="3.4" stroke-linecap="round"/>
+  <line x1="50" y1="44" x2="69" y2="19" stroke="#B00D1E" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="29" cy="17" r="5.4" fill="#B00D1E"/>
+  <circle cx="71" cy="17" r="5.4" fill="#B00D1E"/>
+
+  <path d="M18 50 Q50 43 82 50 Q87 67 82 85 Q50 92 18 85 Q13 67 18 50 Z"
+        stroke="#F4573F" stroke-width="6.5" stroke-linejoin="round" fill="none"/>
+  <rect x="36" y="90" width="28" height="7" rx="3" fill="#B00D1E"/>
+</svg>
