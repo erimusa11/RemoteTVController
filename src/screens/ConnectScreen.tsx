@@ -44,9 +44,11 @@ export function ConnectScreen() {
 
       {!isReal ? (
         <View style={styles.demoBanner}>
+          <Text style={styles.demoTitle}>Demo mode — these TVs are not real</Text>
           <Text style={styles.demoText}>
-            Preview mode — this browser can&apos;t open TV sockets, so you&apos;re driving a
-            simulated TV. Any 6-digit code works.
+            This build has no TV connection yet, so the TVs listed below are fake and your
+            real TV will never show a pairing code. Any 6-character code is accepted, so you can
+            try out the remote. Real pairing arrives with the next build.
           </Text>
         </View>
       ) : null}
@@ -68,7 +70,7 @@ export function ConnectScreen() {
         <Step
           n={3}
           title="Scan and pair"
-          body="Pick your TV below, then type the 6 digits it shows on screen. Once only."
+          body="Pick your TV below, then type the 6 characters it shows on screen. Once only."
           last
         />
       </View>
@@ -267,6 +269,12 @@ const styles = StyleSheet.create({
     padding: spacing(3.5),
     borderWidth: 1,
     borderColor: 'rgba(244,87,63,0.3)',
+  },
+  demoTitle: {
+    color: colors.coralSoft,
+    fontSize: 13,
+    fontWeight: '800',
+    marginBottom: spacing(1.5),
   },
   demoText: { color: colors.coralSoft, fontSize: 13, lineHeight: 19 },
 

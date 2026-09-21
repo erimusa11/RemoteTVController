@@ -46,7 +46,9 @@ export function PairScreen() {
   }, [state.status]);
 
   const onChange = async (raw: string) => {
-    const digits = raw.replace(/\D/g, '').slice(0, LENGTH);
+    // The protocol asks the TV for ENCODING_TYPE_HEXADECIMAL, so the code on
+    // screen is six hex characters — digits plus A-F, not digits only.
+    const digits = raw.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, LENGTH);
     setCode(digits);
     if (state.error) clearError();
 
@@ -98,7 +100,8 @@ export function PairScreen() {
 
             <Text style={styles.title}>Look at your TV</Text>
             <Text style={styles.sub}>
-              {state.device?.name ?? 'Your TV'} is showing a six-digit code. Type it here.
+              {state.device?.name ?? 'Your TV'} is showing a six-character code. Type it here —
+              it can contain letters as well as numbers.
             </Text>
 
             <Pressable style={styles.boxes} onPress={() => input.current?.focus()}>
@@ -124,7 +127,9 @@ export function PairScreen() {
               ref={input}
               value={code}
               onChangeText={onChange}
-              keyboardType="number-pad"
+              keyboardType="visible-password"
+              autoCapitalize="characters"
+              autoCorrect={false}
               maxLength={LENGTH}
               autoFocus
               editable={!busy}

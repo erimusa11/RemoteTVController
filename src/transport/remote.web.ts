@@ -7,7 +7,7 @@ import type { AtvRemote, KeyPressKind, TvDevice } from './types';
  * itself — is clickable in a browser. Raw TLS sockets don't exist on the web,
  * so this is the only thing that can run there.
  *
- * Any 6-digit code is accepted. Volume and the "current app" readout are
+ * Any 6-character code is accepted. Volume and the "current app" readout are
  * tracked locally so the UI has something real to reflect.
  */
 class SimulatedRemote implements AtvRemote {
@@ -68,8 +68,8 @@ class SimulatedRemote implements AtvRemote {
   }
 
   async submitCode(code: string) {
-    if (!/^\d{6}$/.test(code)) {
-      throw new Error('The code must be 6 digits.');
+    if (!/^[0-9A-Fa-f]{6}$/.test(code)) {
+      throw new Error('The code must be 6 characters (0-9, A-F).');
     }
     const token = this.session; // continuing the pairing session, not starting one
     this.emitter.emit({ status: 'connecting' });
