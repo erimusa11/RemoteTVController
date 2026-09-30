@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, Line, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { useRemote } from '../RemoteContext';
 import { colors, radius, spacing } from '../theme';
@@ -94,9 +95,7 @@ export function PairScreen() {
           </>
         ) : (
           <>
-            <View style={styles.tvGlyph}>
-              <Text style={styles.tvDigits}>••••••</Text>
-            </View>
+            <TvWithCode />
 
             <Text style={styles.title}>Look at your TV</Text>
             <Text style={styles.sub}>
@@ -157,6 +156,37 @@ export function PairScreen() {
   );
 }
 
+/** The brand TV, with the code slots lit on its screen: "look over there". */
+function TvWithCode() {
+  return (
+    <Svg width={170} height={128} viewBox="0 0 170 128">
+      <Defs>
+        <LinearGradient id="pairScreen" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#24121A" />
+          <Stop offset="1" stopColor="#0B0B10" />
+        </LinearGradient>
+      </Defs>
+      <Line x1="85" y1="22" x2="66" y2="4" stroke="#fff" strokeWidth={4} strokeLinecap="round" />
+      <Line x1="85" y1="22" x2="104" y2="4" stroke="#fff" strokeWidth={4} strokeLinecap="round" />
+      <Rect x="8" y="22" width="154" height="92" rx="22" fill="#fff" />
+      <Rect x="18" y="32" width="134" height="72" rx="14" fill="url(#pairScreen)" />
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Rect
+          key={i}
+          x={30 + i * 19}
+          y={58}
+          width={15}
+          height={20}
+          rx={4}
+          fill={i < 3 ? '#F4573F' : '#FF7A66'}
+          opacity={0.35 + i * 0.1}
+        />
+      ))}
+      <Rect x="62" y="118" width="46" height="8" rx="4" fill="#fff" />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'transparent', paddingHorizontal: spacing(6) },
   back: { alignSelf: 'flex-start', paddingVertical: spacing(2) },
@@ -164,17 +194,6 @@ const styles = StyleSheet.create({
 
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing(4) },
 
-  tvGlyph: {
-    width: 140,
-    height: 88,
-    borderRadius: radius.md,
-    borderWidth: 3,
-    borderColor: colors.coral,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing(2),
-  },
-  tvDigits: { color: colors.coral, fontSize: 28, letterSpacing: 4, fontWeight: '800' },
 
   title: { color: colors.text, fontSize: 26, fontWeight: '800', textAlign: 'center' },
   sub: {

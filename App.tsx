@@ -17,7 +17,7 @@ import { colors } from './src/theme';
 function Router() {
   const { state } = useRemote();
 
-  if (state.status === 'connected') return <RemoteScreen />;
+  if (state.status === 'connected' || state.status === 'reconnecting') return <RemoteScreen />;
   if (
     state.status === 'pairing' ||
     state.status === 'awaiting-code' ||

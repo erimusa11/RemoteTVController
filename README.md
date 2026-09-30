@@ -6,9 +6,11 @@ A mobile remote control for Android TV / Google TV, built with Expo and React Na
 
 - **Discovery** — finds Android TVs on the LAN via mDNS (`_androidtvremote2._tcp`).
 - **Pairing** — pairs over TLS and stores the certificate on-device, so you only enter the 6-digit code once per TV.
-- **D-Pad & navigation** — directional pad, OK/back/home, volume and mute, power.
-- **App shortcuts** — one-tap launch tiles for YouTube, Netflix, Prime Video, Disney+, Spotify, Plex, Twitch, DAZN.
-- **Keyboard input** — send free-text input to the TV (e.g. search fields).
+- **Auto-reconnect** — a dropped session (Wi-Fi hiccup, TV asleep, app backgrounded) is revived automatically.
+- **D-Pad or touchpad** — directional pad or a swipe touchpad (tap = OK), plus back/home/menu, volume, mute and power.
+- **Live TV state** — what's on screen, volume on the TV's own scale, and a standby banner with one-tap wake.
+- **App shortcuts** — one-tap launch tiles for YouTube, Netflix, Prime Video, Disney+, Spotify, Plex, Twitch, DAZN, with the running app highlighted.
+- **Keyboard input** — send a line of text, or live-type keystroke by keystroke (backspace included).
 - **Haptics** — tactile feedback on button presses (native only).
 - **Web fallback** — a simulated TV backend so the UI can be developed and previewed in a browser, where raw TLS sockets aren't available.
 

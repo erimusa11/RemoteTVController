@@ -8,7 +8,7 @@ import java.io.OutputStream
 import java.security.MessageDigest
 import java.security.interfaces.RSAPublicKey
 
-class PairingException(message: String) : Exception(message)
+class PairingException(message: String, val sessionAlive: Boolean = false) : Exception(message)
 
 /**
  * The pairing handshake on port 6467.
@@ -89,7 +89,7 @@ class PairingClient(private val context: Context) {
 
     val code = rawCode.trim().uppercase()
     if (!Regex("^[0-9A-F]{6}$").matches(code)) {
-      throw PairingException("The code is 6 characters — digits and the letters A to F.")
+      throw PairingException("The code is 6 characters — digits and the letters A to F.", sessionAlive = true)
     }
 
     val codeBytes = hexToBytes(code)
@@ -109,7 +109,10 @@ class PairingClient(private val context: Context) {
     // The first code byte is a checksum over the rest, so a typo is caught
     // here without bothering the TV.
     if (hash[0] != codeBytes[0]) {
-      throw PairingException("That code doesn't match. Check the characters on the TV.")
+      throw PairingException(
+        "That code doesn't match. Check the characters on the TV.",
+        sessionAlive = true,
+      )
     }
 
     send {

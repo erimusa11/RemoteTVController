@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 
 import { colors } from '../theme';
 import { tap, bump } from '../lib/haptics';
@@ -103,7 +103,7 @@ export function DPad({ size = 264, onPress, repeatInterval = 130 }: Props) {
     [engage, release, sectorAt],
   );
 
-  const fillFor = (s: Sector) => (active === s ? colors.coralDim : 'transparent');
+  const fillFor = (s: Sector) => (active === s ? 'url(#dpWedge)' : 'transparent');
 
   return (
     <View
@@ -111,8 +111,33 @@ export function DPad({ size = 264, onPress, repeatInterval = 130 }: Props) {
       {...responder.panHandlers}
     >
       <Svg width={size} height={size} viewBox="0 0 100 100" pointerEvents="none">
-        <Circle cx="50" cy="50" r="49" fill={colors.surface} />
-        <Circle cx="50" cy="50" r="49" fill="none" stroke={colors.hairline} strokeWidth={1} />
+        <Defs>
+          <LinearGradient id="dpRing" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#262633" />
+            <Stop offset="1" stopColor="#14141C" />
+          </LinearGradient>
+          <LinearGradient id="dpRim" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.16} />
+            <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0.02} />
+            <Stop offset="1" stopColor={colors.coral} stopOpacity={0.18} />
+          </LinearGradient>
+          <RadialGradient id="dpWedge" cx="50" cy="50" r="48" gradientUnits="userSpaceOnUse">
+            <Stop offset="0.35" stopColor={colors.coral} stopOpacity={0.05} />
+            <Stop offset="1" stopColor={colors.coral} stopOpacity={0.38} />
+          </RadialGradient>
+          <LinearGradient id="dpOk" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#30303F" />
+            <Stop offset="1" stopColor="#1B1B25" />
+          </LinearGradient>
+          <LinearGradient id="dpOkOn" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={colors.coralSoft} />
+            <Stop offset="1" stopColor={colors.deepRed} />
+          </LinearGradient>
+        </Defs>
+
+        <Circle cx="50" cy="50" r="49" fill="url(#dpRing)" />
+        <Circle cx="50" cy="50" r="48.6" fill="none" stroke="url(#dpRim)" strokeWidth={1.2} />
+        <Circle cx="50" cy="50" r="23" fill="none" stroke="rgba(0,0,0,0.35)" strokeWidth={3} />
 
         <Path d={WEDGE.up} fill={fillFor('up')} />
         <Path d={WEDGE.right} fill={fillFor('right')} />
@@ -131,13 +156,14 @@ export function DPad({ size = 264, onPress, repeatInterval = 130 }: Props) {
           />
         ))}
 
+        {active === 'ok' ? <Circle cx="50" cy="50" r="23" fill={colors.coral} opacity={0.18} /> : null}
         <Circle
           cx="50"
           cy="50"
           r="19"
-          fill={active === 'ok' ? colors.coral : colors.surfaceHigh}
-          stroke={colors.hairline}
-          strokeWidth={1}
+          fill={active === 'ok' ? 'url(#dpOkOn)' : 'url(#dpOk)'}
+          stroke="rgba(255,255,255,0.10)"
+          strokeWidth={0.8}
         />
       </Svg>
 

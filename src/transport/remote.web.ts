@@ -7,8 +7,9 @@ import type { AtvRemote, KeyPressKind, TvDevice } from './types';
  * itself — is clickable in a browser. Raw TLS sockets don't exist on the web,
  * so this is the only thing that can run there.
  *
- * Any 6-character code is accepted. Volume and the "current app" readout are
- * tracked locally so the UI has something real to reflect.
+ * It behaves like the native transport: pairing only proves the code, the
+ * caller then connects, and connection status is driven by RemoteContext.
+ * Any 6-character hex code is accepted.
  */
 class SimulatedRemote implements AtvRemote {
   readonly isReal = false;
@@ -17,14 +18,13 @@ class SimulatedRemote implements AtvRemote {
   private discovering = false;
   private paired = new Set<string>();
   private volume = 18;
+  private readonly volumeMax = 100;
   private muted = false;
-  private device: TvDevice | null = null;
+  private isOn = true;
 
   /**
-   * Bumped by disconnect() and by starting a new handshake. A delayed emit
-   * checks its captured token against the current value before firing, so
-   * backing out mid-handshake can't be overridden by a stale timer that
-   * resolves afterwards and silently re-opens the pairing screen.
+   * Bumped by disconnect() and by every new handshake, so a delayed step that
+   * resolves after the user backed out can tell it is stale.
    */
   private session = 0;
 
@@ -52,77 +52,71 @@ class SimulatedRemote implements AtvRemote {
       if (!this.discovering) return;
       onFound(tv);
     }
+    this.discovering = false;
   }
 
   async stopDiscovery() {
     this.discovering = false;
   }
 
-  async startPairing(device: TvDevice) {
-    const token = ++this.session;
-    this.device = device;
-    this.emitter.emit({ status: 'pairing', device, error: null });
+  async startPairing(_device: TvDevice) {
+    ++this.session;
     await delay(900);
-    if (token !== this.session) return; // backed out while the TV "thought"
-    this.emitter.emit({ status: 'awaiting-code' });
   }
 
   async submitCode(code: string) {
     if (!/^[0-9A-Fa-f]{6}$/.test(code)) {
-      throw new Error('The code must be 6 characters (0-9, A-F).');
+      throw codedError('ERR_BAD_CODE', 'The code must be 6 characters (0-9, A-F).');
     }
-    const token = this.session; // continuing the pairing session, not starting one
-    this.emitter.emit({ status: 'connecting' });
-    await delay(800);
-    if (token !== this.session) return; // backed out while the code was checked
-    if (this.device) this.paired.add(this.device.id);
-    this.emitter.emit({
-      status: 'connected',
-      volume: this.volume,
-      muted: this.muted,
-      currentApp: 'com.google.android.tvlauncher',
-    });
+    await delay(700);
   }
 
   async connect(device: TvDevice) {
     const token = ++this.session;
-    this.device = device;
-    this.emitter.emit({ status: 'connecting', device, error: null });
     await delay(600);
-    if (token !== this.session) return; // disconnected while the session opened
+    if (token !== this.session) throw new Error('Cancelled');
+    this.paired.add(device.id);
     this.emitter.emit({
       status: 'connected',
       volume: this.volume,
+      volumeMax: this.volumeMax,
       muted: this.muted,
+      isOn: this.isOn,
       currentApp: 'com.google.android.tvlauncher',
     });
   }
 
   async disconnect() {
-    this.session++; // invalidates any in-flight handshake's delayed emit
-    this.device = null;
-    this.emitter.emit({ status: 'idle', device: null, currentApp: null });
+    this.session++;
   }
 
   async sendKey(keyCode: number, kind: KeyPressKind = 'short') {
     if (kind === 'long-end') return;
 
-    if (keyCode === KEY.VOLUME_UP) {
-      this.volume = Math.min(100, this.volume + 1);
-      this.muted = false;
-    } else if (keyCode === KEY.VOLUME_DOWN) {
-      this.volume = Math.max(0, this.volume - 1);
-      this.muted = false;
-    } else if (keyCode === KEY.VOLUME_MUTE) {
-      this.muted = !this.muted;
-    } else if (keyCode === KEY.HOME) {
-      this.emitter.emit({ currentApp: 'com.google.android.tvlauncher' });
-      return;
-    } else {
-      return;
+    switch (keyCode) {
+      case KEY.VOLUME_UP:
+        this.volume = Math.min(this.volumeMax, this.volume + 1);
+        this.muted = false;
+        break;
+      case KEY.VOLUME_DOWN:
+        this.volume = Math.max(0, this.volume - 1);
+        this.muted = false;
+        break;
+      case KEY.VOLUME_MUTE:
+        this.muted = !this.muted;
+        break;
+      case KEY.POWER:
+        this.isOn = !this.isOn;
+        this.emitter.emit({ isOn: this.isOn });
+        return;
+      case KEY.HOME:
+        this.emitter.emit({ currentApp: 'com.google.android.tvlauncher' });
+        return;
+      default:
+        return;
     }
 
-    this.emitter.emit({ volume: this.volume, muted: this.muted });
+    this.emitter.emit({ volume: this.volume, volumeMax: this.volumeMax, muted: this.muted });
   }
 
   async sendText(_text: string) {
@@ -147,5 +141,8 @@ class SimulatedRemote implements AtvRemote {
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const codedError = (code: string, message: string) =>
+  Object.assign(new Error(message), { code });
 
 export default new SimulatedRemote() as AtvRemote;

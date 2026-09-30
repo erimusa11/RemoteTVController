@@ -6,7 +6,8 @@ import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
-class AtvRemoteError(message: String) : CodedException(message)
+class AtvRemoteError(message: String, code: String = "ERR_ATV_REMOTE") :
+  CodedException(code, message, null)
 
 /**
  * JS-facing surface for the Android TV Remote Service v2 protocol.
@@ -43,6 +44,7 @@ class AtvRemoteModule : Module() {
     }
 
     AsyncFunction("startPairing") { host: String, port: Int, deviceId: String ->
+      pairing?.close()
       val client = PairingClient(context)
       pairing = client
       try {
@@ -58,10 +60,17 @@ class AtvRemoteModule : Module() {
       val client = pairing ?: throw AtvRemoteError("Start pairing with a TV first")
       try {
         client.submitCode(code)
-      } catch (e: Exception) {
-        throw AtvRemoteError(friendly(e))
-      } finally {
         pairing = null
+      } catch (e: Exception) {
+        // A typo caught by the local checksum leaves the TV's session (and the
+        // code on screen) intact, so the user can simply retype. Anything else
+        // means the TV hung up and a fresh code is needed.
+        if (e is PairingException && e.sessionAlive) {
+          throw AtvRemoteError(friendly(e), "ERR_BAD_CODE")
+        }
+        pairing = null
+        client.close()
+        throw AtvRemoteError(friendly(e), "ERR_PAIRING_RESTART")
       }
     }
 

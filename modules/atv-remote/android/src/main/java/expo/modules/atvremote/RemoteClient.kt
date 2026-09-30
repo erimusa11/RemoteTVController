@@ -41,6 +41,9 @@ class RemoteClient(
     disconnect()
 
     val p = Certs.connect(context, host, port, deviceId, allowUnknown = false)
+    // The TV pings every few seconds, so this much silence means the session
+    // is dead (TV unplugged, Wi-Fi gone) even though TCP hasn't noticed yet.
+    p.socket.soTimeout = IDLE_TIMEOUT_MS
     pinned = p
     input = BufferedInputStream(p.socket.inputStream)
     output = BufferedOutputStream(p.socket.outputStream)
@@ -102,8 +105,7 @@ class RemoteClient(
         in 'a'..'z' -> KEYCODE_A + (ch - 'a')
         in 'A'..'Z' -> KEYCODE_A + (ch - 'A')
         in '0'..'9' -> KEYCODE_0 + (ch - '0')
-        ' ' -> KEYCODE_SPACE
-        else -> continue // punctuation has no portable keycode mapping
+        else -> PUNCTUATION[ch] ?: continue // no portable keycode for the rest
       }
       sendKey(keyCode, DIRECTION_SHORT)
       // The TV's IME drops events that arrive faster than it can consume.
@@ -140,17 +142,23 @@ class RemoteClient(
             send { message(9) { varint(1, ping?.int(1) ?: 0) } }
           }
 
+          // RemoteStart.started doubles as the power state: the TV resends it
+          // whenever it wakes up or drops into standby.
           message.has(40) -> {
-            onState(mapOf("status" to "connected", "error" to null))
+            val isOn = message.nested(40)?.bool(1) ?: true
+            onState(mapOf("status" to "connected", "error" to null, "isOn" to isOn))
             ready.countDown()
           }
 
+          // volume_level is on the TV's own scale (often 0-15 or 0-60, not
+          // 0-100), so the max travels with it for the UI to normalise.
           message.has(50) -> {
             val volume = message.nested(50)
             if (volume != null) {
               onState(
                 mapOf(
                   "volume" to volume.int(7),
+                  "volumeMax" to volume.int(6),
                   "muted" to volume.bool(8),
                 ),
               )
@@ -195,9 +203,18 @@ class RemoteClient(
     private const val PACKAGE_NAME = "it.eri.remotetv"
     private const val APP_VERSION = "1.0.0"
 
+    private const val IDLE_TIMEOUT_MS = 25_000
+
     private const val KEYCODE_0 = 7
     private const val KEYCODE_A = 29
-    private const val KEYCODE_SPACE = 62
     private const val DIRECTION_SHORT = 3
+
+    /** Unshifted android.view.KeyEvent codes. */
+    private val PUNCTUATION = mapOf(
+      ' ' to 62, '\n' to 66, '\t' to 61,
+      '.' to 56, ',' to 55, '-' to 69, '=' to 70, '[' to 71, ']' to 72,
+      '\\' to 73, ';' to 74, '\'' to 75, '/' to 76, '@' to 77, '+' to 81,
+      '*' to 17, '#' to 18,
+    )
   }
 }

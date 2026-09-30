@@ -14,7 +14,7 @@
     "android": {
       "package": "it.eri.remotetv",
       "adaptiveIcon": {
-        "backgroundColor": "#0B0B10",
+        "backgroundColor": "#F4573F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

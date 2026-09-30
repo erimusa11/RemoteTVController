@@ -34,7 +34,11 @@ import javax.security.auth.x500.X500Principal
  *    certificate.
  */
 object Certs {
-  private const val ALIAS = "remotetv.client.key"
+  // v2: the original alias's key may have been generated allowing RSA-PSS,
+  // which is broken in AndroidKeyStore on many devices (see setSignaturePaddings
+  // below). Renaming forces a fresh, PKCS1-only key instead of reusing a
+  // possibly-broken one already cached under the old alias.
+  private const val ALIAS = "remotetv.client.key.v2"
   private const val PROVIDER = "AndroidKeyStore"
   private const val PIN_PREFS = "remotetv.pins"
 
@@ -70,10 +74,12 @@ object Certs {
         KeyProperties.DIGEST_SHA384,
         KeyProperties.DIGEST_SHA512,
       )
-      .setSignaturePaddings(
-        KeyProperties.SIGNATURE_PADDING_RSA_PKCS1,
-        KeyProperties.SIGNATURE_PADDING_RSA_PSS,
-      )
+      // PSS is deliberately not offered: on many devices AndroidKeyStore's
+      // RSA-PSS signing is broken (fails inside Keymaster/BoringSSL with an
+      // opaque "OPENSSL_internal:internal error" at TLS handshake time), so
+      // advertising it just gives Conscrypt a CertificateVerify scheme that
+      // blows up on sign(). PKCS#1 v1.5 is universally supported.
+      .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
       .build()
 
     KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, PROVIDER).run {
@@ -144,6 +150,9 @@ object Certs {
     val plain = Socket()
     plain.connect(InetSocketAddress(host, port), timeoutMs)
     plain.tcpNoDelay = true
+    // Without a read timeout a TV that accepts the TCP connection but never
+    // answers would hang the handshake (and every queued module call) forever.
+    plain.soTimeout = timeoutMs
 
     val socket = ssl.socketFactory.createSocket(plain, host, port, true) as SSLSocket
     socket.startHandshake()

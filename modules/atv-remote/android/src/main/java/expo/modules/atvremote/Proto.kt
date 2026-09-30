@@ -16,6 +16,7 @@ import java.io.OutputStream
 
 const val WIRE_VARINT = 0
 const val WIRE_LENGTH = 2
+private const val MAX_MESSAGE_BYTES = 1L shl 20
 
 class ProtoWriter {
   private val out = ByteArrayOutputStream()
@@ -138,6 +139,9 @@ fun readDelimited(input: InputStream): ByteArray {
     if (shift > 35) throw EOFException("Malformed length prefix from the TV")
   }
 
+  // Real messages are a few hundred bytes; refuse to allocate whatever a
+  // corrupt or hostile length prefix asks for.
+  if (len > MAX_MESSAGE_BYTES) throw EOFException("Oversized message from the TV")
   val buf = ByteArray(len.toInt())
   var read = 0
   while (read < buf.size) {

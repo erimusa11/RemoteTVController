@@ -31,6 +31,16 @@ export async function rememberDevice(device: TvDevice) {
   ]);
 }
 
+/** Refresh a known TV's stored address without making it the last-used one. */
+export async function updateKnownDevice(device: TvDevice) {
+  const known = await loadKnownDevices();
+  if (!known.some((d) => d.id === device.id)) return;
+  await AsyncStorage.setItem(
+    KNOWN_KEY,
+    JSON.stringify(known.map((d) => (d.id === device.id ? { ...d, ...device } : d))),
+  );
+}
+
 export async function forgetDevice(deviceId: string) {
   const known = await loadKnownDevices();
   const ops: Promise<unknown>[] = [
@@ -54,4 +64,26 @@ export async function loadLastDevice(): Promise<TvDevice | null> {
   } catch {
     return null;
   }
+}
+
+const PREFS_KEY = 'remotetv.prefs';
+
+export type Prefs = {
+  /** Which navigation surface the remote tab shows. */
+  navMode: 'dpad' | 'touchpad';
+};
+
+const DEFAULT_PREFS: Prefs = { navMode: 'dpad' };
+
+export async function loadPrefs(): Promise<Prefs> {
+  try {
+    const raw = await AsyncStorage.getItem(PREFS_KEY);
+    return raw ? { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) } : DEFAULT_PREFS;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+export async function savePrefs(prefs: Prefs) {
+  await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs)).catch(() => {});
 }

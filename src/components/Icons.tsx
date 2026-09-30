@@ -193,4 +193,32 @@ export const Icon = {
       <Path d="M3 9.5 H21 M9.5 9.5 V19.5" />
     </Base>
   ),
+
+  Settings: (p: IconProps) => (
+    <Base {...p}>
+      <Circle cx="12" cy="12" r="3" />
+      <Path d="M12 2.8 V5 M12 19 V21.2 M2.8 12 H5 M19 12 H21.2 M5.5 5.5 L7.1 7.1 M16.9 16.9 L18.5 18.5 M5.5 18.5 L7.1 16.9 M16.9 7.1 L18.5 5.5" />
+      <Circle cx="12" cy="12" r="6.6" />
+    </Base>
+  ),
+
+  Touchpad: (p: IconProps) => (
+    <Base {...p}>
+      <Rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+      <Circle cx="12" cy="12" r="2.2" />
+      <Path d="M12 6.5 V7.5 M12 16.5 V17.5 M6.5 12 H7.5 M16.5 12 H17.5" />
+    </Base>
+  ),
+
+  DPadCross: (p: IconProps) => (
+    <Base {...p}>
+      <Path d="M9 3.5 H15 V9 H20.5 V15 H15 V20.5 H9 V15 H3.5 V9 H9 Z" />
+    </Base>
+  ),
+
+  Close: (p: IconProps) => (
+    <Base {...p}>
+      <Path d="M6 6 L18 18 M18 6 L6 18" />
+    </Base>
+  ),
 };

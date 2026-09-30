@@ -56,23 +56,44 @@ class NativeRemote implements AtvRemote {
 
   private emitter = new StateEmitter();
 
+  /**
+   * Each scan gets a token so a window that is closed early — or superseded by
+   * a newer scan — can't stop the native discovery the newer one relies on.
+   */
+  private scanToken = 0;
+  private endScanWindow: (() => void) | null = null;
+
   constructor(private readonly mod: NativeAtvRemote) {
     this.mod.addListener('onState', (patch) => this.emitter.emit(patch));
   }
 
   async discover(onFound: (device: TvDevice) => void) {
+    this.endScanWindow?.();
+    const token = ++this.scanToken;
     const sub = this.mod.addListener('onDevice', onFound);
     try {
       await this.mod.discover();
-      await new Promise((resolve) => setTimeout(resolve, SCAN_WINDOW_MS));
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, SCAN_WINDOW_MS);
+        this.endScanWindow = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
     } finally {
       sub.remove();
-      await this.mod.stopDiscovery().catch(() => {});
+      if (token === this.scanToken) {
+        this.endScanWindow = null;
+        await this.mod.stopDiscovery().catch(() => {});
+      }
     }
   }
 
-  stopDiscovery() {
-    return this.mod.stopDiscovery();
+  async stopDiscovery() {
+    const end = this.endScanWindow;
+    this.endScanWindow = null;
+    if (end) end(); // the window's finally block stops the native side
+    else await this.mod.stopDiscovery();
   }
 
   startPairing(device: TvDevice) {

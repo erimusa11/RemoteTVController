@@ -23,13 +23,19 @@ export type ConnectionStatus =
   | 'pairing'
   | 'awaiting-code'
   | 'connected'
+  /** The session dropped unexpectedly and is being re-opened in the background. */
+  | 'reconnecting'
   | 'error';
 
 export type TvState = {
   status: ConnectionStatus;
   device: TvDevice | null;
-  /** 0-100, or null when the TV hasn't reported one yet. */
+  /** On the TV's own scale (see volumeMax), or null until the TV reports one. */
   volume: number | null;
+  /** Top of the TV's volume scale; many sets use 15 or 60 rather than 100. */
+  volumeMax: number | null;
+  /** False while the TV is in standby; null until it says. */
+  isOn: boolean | null;
   muted: boolean;
   /** Package name of whatever is on screen, when the TV reports it. */
   currentApp: string | null;
@@ -54,6 +60,11 @@ export interface AtvRemote {
    * the caller then feeds that code to `submitCode`.
    */
   startPairing(device: TvDevice): Promise<void>;
+  /**
+   * Only proves the code and pins the TV; call `connect` afterwards. Rejects
+   * with code `ERR_BAD_CODE` (retype, same code) or `ERR_PAIRING_RESTART`
+   * (the TV hung up; start pairing again for a fresh code).
+   */
   submitCode(code: string): Promise<void>;
 
   /** Reconnect using a certificate we already paired with. */

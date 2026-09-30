@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { LogoMark, Wordmark } from '../components/Logo';
+import { Icon } from '../components/Icons';
+import { Wordmark } from '../components/Logo';
 import { ScanRadar } from '../components/ScanRadar';
 import { useRemote } from '../RemoteContext';
 import { colors, radius, shadow, spacing } from '../theme';
@@ -19,13 +20,30 @@ import type { TvDevice } from '../transport/types';
 import { tap } from '../lib/haptics';
 
 export function ConnectScreen() {
-  const { discovered, known, scanning, scan, stopScan, choose, forget, addManual, isReal, state } =
-    useRemote();
+  const {
+    discovered,
+    known,
+    scanning,
+    scan,
+    stopScan,
+    choose,
+    forget,
+    addManual,
+    isReal,
+    state,
+    clearError,
+  } = useRemote();
   const insets = useSafeAreaInsets();
   const [manualOpen, setManualOpen] = useState(false);
   const [host, setHost] = useState('');
 
   const nothingFound = !scanning && discovered.length === 0;
+  // A paired TV that answers the scan belongs in "Your TVs" (marked online),
+  // not listed twice.
+  const knownIds = new Set(known.map((d) => d.id));
+  const onlineIds = new Set(discovered.map((d) => d.id));
+  const fresh = discovered.filter((d) => !knownIds.has(d.id));
+  const validHost = /^[\w.-]+$/.test(host.trim());
 
   return (
     <ScrollView
@@ -46,17 +64,17 @@ export function ConnectScreen() {
         <View style={styles.demoBanner}>
           <Text style={styles.demoTitle}>Demo mode — these TVs are not real</Text>
           <Text style={styles.demoText}>
-            This build has no TV connection yet, so the TVs listed below are fake and your
-            real TV will never show a pairing code. Any 6-character code is accepted, so you can
-            try out the remote. Real pairing arrives with the next build.
+            This build can&apos;t open network sockets (browser or Expo Go), so the TVs below are
+            simulated. Any 6-character code works. Install the Android build to control a real TV.
           </Text>
         </View>
       ) : null}
 
       {state.error ? (
-        <View style={styles.errorBanner}>
+        <Pressable onPress={clearError} style={styles.errorBanner}>
           <Text style={styles.errorText}>{state.error}</Text>
-        </View>
+          <Icon.Close size={14} color="#FF9B8E" weight={2.4} />
+        </Pressable>
       ) : null}
 
       <View style={styles.card}>
@@ -78,7 +96,9 @@ export function ConnectScreen() {
       <Pressable
         onPress={() => {
           tap();
-          scanning ? stopScan() : scan();
+          clearError();
+          if (scanning) stopScan();
+          else scan();
         }}
         style={({ pressed }) => [
           styles.scanButton,
@@ -91,24 +111,25 @@ export function ConnectScreen() {
         </Text>
       </Pressable>
 
-      {discovered.length > 0 ? (
-        <Section title="Found on your network">
-          {discovered.map((d) => (
-            <DeviceRow key={d.id} device={d} onPress={() => choose(d)} />
-          ))}
-        </Section>
-      ) : null}
-
       {known.length > 0 ? (
-        <Section title="Already paired">
+        <Section title="Your TVs">
           {known.map((d) => (
             <DeviceRow
               key={d.id}
               device={d}
               paired
+              online={onlineIds.has(d.id)}
               onPress={() => choose(d)}
               onForget={() => forget(d)}
             />
+          ))}
+        </Section>
+      ) : null}
+
+      {fresh.length > 0 ? (
+        <Section title="Found on your network">
+          {fresh.map((d) => (
+            <DeviceRow key={d.id} device={d} online onPress={() => choose(d)} />
           ))}
         </Section>
       ) : null}
@@ -147,10 +168,14 @@ export function ConnectScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               style={styles.input}
+              returnKeyType="go"
+              onSubmitEditing={() => {
+                if (validHost) addManual(host);
+              }}
             />
             <Pressable
+              disabled={!validHost}
               onPress={() => {
-                if (!host.trim()) return;
                 Keyboard.dismiss();
                 tap();
                 addManual(host);
@@ -158,6 +183,7 @@ export function ConnectScreen() {
               style={({ pressed }) => [
                 styles.manualGo,
                 { backgroundColor: pressed ? colors.coralSoft : colors.deepRed },
+                !validHost && { opacity: 0.4 },
               ]}
             >
               <Text style={styles.manualGoText}>Connect</Text>
@@ -210,12 +236,22 @@ function DeviceRow({
   onPress,
   onForget,
   paired,
+  online,
 }: {
   device: TvDevice;
   onPress: () => void;
   onForget?: () => void;
   paired?: boolean;
+  online?: boolean;
 }) {
+  // Forgetting throws away the pairing, so it takes a second, deliberate tap.
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
   return (
     <Pressable
       onPress={() => {
@@ -227,8 +263,9 @@ function DeviceRow({
         { backgroundColor: pressed ? colors.surfacePress : colors.surfaceHigh },
       ]}
     >
-      <View style={styles.deviceIcon}>
-        <LogoMark size={26} />
+      <View style={[styles.deviceIcon, paired && styles.deviceIconPaired]}>
+        <Icon.Tv size={22} color={paired ? colors.coral : colors.textMuted} />
+        {online ? <View style={styles.onlineDot} /> : null}
       </View>
       <View style={styles.deviceMeta}>
         <Text style={styles.deviceName} numberOfLines={1}>
@@ -236,12 +273,26 @@ function DeviceRow({
         </Text>
         <Text style={styles.deviceHost}>
           {device.host}
-          {paired ? '  ·  paired' : ''}
+          {paired ? (online ? '  ·  online' : '  ·  paired') : '  ·  tap to pair'}
         </Text>
       </View>
       {onForget ? (
-        <Pressable hitSlop={10} onPress={onForget} style={styles.forget}>
-          <Text style={styles.forgetText}>Forget</Text>
+        <Pressable
+          hitSlop={10}
+          onPress={() => {
+            if (!confirming) {
+              tap();
+              setConfirming(true);
+              return;
+            }
+            setConfirming(false);
+            onForget();
+          }}
+          style={[styles.forget, confirming && styles.forgetConfirm]}
+        >
+          <Text style={[styles.forgetText, confirming && { color: '#fff' }]}>
+            {confirming ? 'Sure?' : 'Forget'}
+          </Text>
         </Pressable>
       ) : (
         <Text style={styles.chevron}>›</Text>
@@ -279,13 +330,16 @@ const styles = StyleSheet.create({
   demoText: { color: colors.coralSoft, fontSize: 13, lineHeight: 19 },
 
   errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing(3),
     backgroundColor: 'rgba(176,13,30,0.18)',
     borderRadius: radius.md,
     padding: spacing(3.5),
     borderWidth: 1,
     borderColor: 'rgba(176,13,30,0.45)',
   },
-  errorText: { color: '#FF9B8E', fontSize: 13, lineHeight: 19 },
+  errorText: { flex: 1, color: '#FF9B8E', fontSize: 13, lineHeight: 19 },
 
   card: {
     backgroundColor: colors.surface,
@@ -358,11 +412,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  deviceIconPaired: { backgroundColor: colors.coralDim },
+  onlineDot: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.green,
+    borderWidth: 2,
+    borderColor: colors.surfaceHigh,
+  },
   deviceMeta: { flex: 1 },
   deviceName: { color: colors.text, fontSize: 15, fontWeight: '600' },
   deviceHost: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
   chevron: { color: colors.textFaint, fontSize: 24, paddingHorizontal: spacing(1) },
-  forget: { paddingHorizontal: spacing(2), paddingVertical: spacing(1) },
+  forget: {
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1.5),
+    borderRadius: 999,
+  },
+  forgetConfirm: { backgroundColor: colors.deepRed },
   forgetText: { color: colors.textFaint, fontSize: 12, fontWeight: '600' },
 
   hint: { color: colors.textFaint, fontSize: 13, lineHeight: 20, textAlign: 'center' },
