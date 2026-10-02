@@ -34,11 +34,14 @@ import javax.security.auth.x500.X500Principal
  *    certificate.
  */
 object Certs {
-  // v2: the original alias's key may have been generated allowing RSA-PSS,
-  // which is broken in AndroidKeyStore on many devices (see setSignaturePaddings
-  // below). Renaming forces a fresh, PKCS1-only key instead of reusing a
-  // possibly-broken one already cached under the old alias.
-  private const val ALIAS = "remotetv.client.key.v2"
+  // v3: the v1 and v2 keys were never authorised for raw RSA, the one signing
+  // operation Conscrypt asks the keystore for in an RSA-PSS handshake (see
+  // generateClientKey), so on Android 10+ they failed against any TV offering
+  // PSS. A key's authorisations are fixed when it is generated, hence a new
+  // alias — as any future change to the spec will need, with the old alias
+  // moved to RETIRED_ALIASES.
+  private const val ALIAS = "remotetv.client.key.v3"
+  private val RETIRED_ALIASES = listOf("remotetv.client.key", "remotetv.client.key.v2")
   private const val PROVIDER = "AndroidKeyStore"
   private const val PIN_PREFS = "remotetv.pins"
 
@@ -65,8 +68,9 @@ object Certs {
       .setCertificateSerialNumber(BigInteger.valueOf(1))
       .setCertificateNotBefore(notBefore.time)
       .setCertificateNotAfter(notAfter.time)
-      // TLS picks the digest during the handshake, so allow the ones a
-      // 1.2/1.3 client-auth signature might ask for rather than guessing one.
+      // TLS hashes inside BoringSSL, so the handshake only ever asks for
+      // DIGEST_NONE; the real digests let older Android versions sign the
+      // self-signed certificate properly instead of with a placeholder.
       .setDigests(
         KeyProperties.DIGEST_NONE,
         KeyProperties.DIGEST_SHA1,
@@ -74,12 +78,16 @@ object Certs {
         KeyProperties.DIGEST_SHA384,
         KeyProperties.DIGEST_SHA512,
       )
-      // PSS is deliberately not offered: on many devices AndroidKeyStore's
-      // RSA-PSS signing is broken (fails inside Keymaster/BoringSSL with an
-      // opaque "OPENSSL_internal:internal error" at TLS handshake time), so
-      // advertising it just gives Conscrypt a CertificateVerify scheme that
-      // blows up on sign(). PKCS#1 v1.5 is universally supported.
       .setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PKCS1)
+      // Conscrypt hashes the handshake itself and hands the keystore only the
+      // RSA step. PKCS#1 arrives as "RSA/ECB/PKCS1Padding", covered by the
+      // signature padding above. RSA-PSS — which on Android 10+ BoringSSL
+      // picks over PKCS#1 whenever the TV offers both, TLS 1.2 included — is
+      // padded in-process and arrives as "RSA/ECB/NoPadding", which the
+      // keystore performs only for keys authorised for no padding. Without
+      // this the handshake fails with "RSA routines:OPENSSL_internal:internal
+      // error" (Conscrypt issue #718), whether or not PSS is listed above.
+      .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
       .build()
 
     KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_RSA, PROVIDER).run {
@@ -88,15 +96,27 @@ object Certs {
     }
   }
 
-  private fun ensureClientKey(): Pair<X509Certificate, PrivateKey> {
+  // Expo runs module calls one at a time, but a JS reload can leave an old
+  // call running beside a new one. Synchronized so two first connections
+  // can't each mint a key, the second replacing the one the first paired with.
+  @Synchronized
+  private fun ensureClientKey(context: Context): Pair<X509Certificate, PrivateKey> {
     val ks = keyStore()
-    if (!ks.containsAlias(ALIAS)) generateClientKey()
+    if (!ks.containsAlias(ALIAS)) {
+      // Pairing binds the TV to our certificate as much as us to its, so any
+      // pin recorded before this key existed belongs to a TV that will now
+      // refuse us. Committed, not applied: it must land before the new key.
+      pins(context).edit().clear().commit()
+      // Housekeeping only; a stale key that won't delete mustn't block pairing.
+      RETIRED_ALIASES.forEach { runCatching { ks.deleteEntry(it) } }
+      generateClientKey()
+    }
     val cert = keyStore().getCertificate(ALIAS) as X509Certificate
     val key = keyStore().getKey(ALIAS, null) as PrivateKey
     return cert to key
   }
 
-  fun clientCertificate(): X509Certificate = ensureClientKey().first
+  fun clientCertificate(context: Context): X509Certificate = ensureClientKey(context).first
 
   fun fingerprint(cert: X509Certificate): String =
     MessageDigest.getInstance("SHA-256").digest(cert.encoded)
@@ -120,7 +140,16 @@ object Certs {
     pins(context).edit().remove(deviceId).apply()
   }
 
-  fun isPaired(context: Context, deviceId: String): Boolean = pinFor(context, deviceId) != null
+  /**
+   * Without our key no TV will take us back, whatever the pins say — true
+   * after an update from a v1/v2 key, or when pins come back from a backup
+   * onto a phone that never had the key. Saying "not paired" sends the user
+   * to pairing instead of a connection the TV is bound to refuse. A keystore
+   * that can't be read counts as no key: pairing then shows the real error.
+   */
+  fun isPaired(context: Context, deviceId: String): Boolean =
+    runCatching { keyStore().containsAlias(ALIAS) }.getOrDefault(false) &&
+      pinFor(context, deviceId) != null
 
   /**
    * @param allowUnknown true only during pairing, when we have not yet seen
@@ -135,7 +164,8 @@ object Certs {
     allowUnknown: Boolean,
     timeoutMs: Int = 10_000,
   ): PinnedSocket {
-    val (cert, key) = ensureClientKey()
+    // Key first: generating one clears the pins, so read the pin after it.
+    val (cert, key) = ensureClientKey(context)
     val trust = PinningTrustManager(pinFor(context, deviceId), allowUnknown)
 
     val ssl = SSLContext.getInstance("TLSv1.2")

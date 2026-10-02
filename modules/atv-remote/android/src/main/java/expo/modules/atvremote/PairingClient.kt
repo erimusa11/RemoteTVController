@@ -93,7 +93,7 @@ class PairingClient(private val context: Context) {
     }
 
     val codeBytes = hexToBytes(code)
-    val clientKey = Certs.clientCertificate().publicKey as RSAPublicKey
+    val clientKey = Certs.clientCertificate(context).publicKey as RSAPublicKey
     val serverCert = p.trust.peerCertificate
       ?: throw PairingException("The TV never presented a certificate")
     val serverKey = serverCert.publicKey as RSAPublicKey
