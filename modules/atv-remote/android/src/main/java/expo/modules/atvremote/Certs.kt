@@ -34,14 +34,18 @@ import javax.security.auth.x500.X500Principal
  *    certificate.
  */
 object Certs {
-  // v3: the v1 and v2 keys were never authorised for raw RSA, the one signing
-  // operation Conscrypt asks the keystore for in an RSA-PSS handshake (see
-  // generateClientKey), so on Android 10+ they failed against any TV offering
-  // PSS. A key's authorisations are fixed when it is generated, hence a new
-  // alias — as any future change to the spec will need, with the old alias
-  // moved to RETIRED_ALIASES.
-  private const val ALIAS = "remotetv.client.key.v3"
-  private val RETIRED_ALIASES = listOf("remotetv.client.key", "remotetv.client.key.v2")
+  // v4: every earlier key's certificate had the same subject and serial
+  // number on every phone, so the TV could not tell two phones apart and
+  // pairing the second one silently unpaired the first (see generateClientKey).
+  // v3 before it: the v1 and v2 keys were never authorised for raw RSA, the
+  // one signing operation Conscrypt asks the keystore for in an RSA-PSS
+  // handshake, so on Android 10+ they failed against any TV offering PSS.
+  // A key's certificate and authorisations are fixed when it is generated,
+  // hence a new alias — as any future change to the spec will need, with the
+  // old alias moved to RETIRED_ALIASES.
+  private const val ALIAS = "remotetv.client.key.v4"
+  private val RETIRED_ALIASES =
+    listOf("remotetv.client.key", "remotetv.client.key.v2", "remotetv.client.key.v3")
   private const val PROVIDER = "AndroidKeyStore"
   private const val PIN_PREFS = "remotetv.pins"
 
@@ -58,14 +62,18 @@ object Certs {
   private fun generateClientKey() {
     val notBefore = Calendar.getInstance()
     val notAfter = Calendar.getInstance().apply { add(Calendar.YEAR, 25) }
+    // Issuer plus serial number is what names a certificate, and a self-signed
+    // one is its own issuer. Both must differ per phone, or the TV files every
+    // install under one entry and each new pairing evicts the last.
+    val serial = BigInteger(63, SecureRandom()).add(BigInteger.ONE)
 
     val spec = KeyGenParameterSpec.Builder(
       ALIAS,
       KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY,
     )
       .setKeySize(2048)
-      .setCertificateSubject(X500Principal("CN=Remote TV by ERI"))
-      .setCertificateSerialNumber(BigInteger.valueOf(1))
+      .setCertificateSubject(X500Principal("CN=Remote TV by ERI ${serial.toString(16)}"))
+      .setCertificateSerialNumber(serial)
       .setCertificateNotBefore(notBefore.time)
       .setCertificateNotAfter(notAfter.time)
       // TLS hashes inside BoringSSL, so the handshake only ever asks for
