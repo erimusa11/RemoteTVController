@@ -210,6 +210,13 @@ export const Icon = {
     </Base>
   ),
 
+  /** Phone-style keypad: three rows of three, plus the 0 underneath. */
+  Numpad: (p: IconProps) => (
+    <Base {...p}>
+      <Path d="M6 4.5 h0.01 M12 4.5 h0.01 M18 4.5 h0.01 M6 9.5 h0.01 M12 9.5 h0.01 M18 9.5 h0.01 M6 14.5 h0.01 M12 14.5 h0.01 M18 14.5 h0.01 M12 19.5 h0.01" strokeWidth={3.4} />
+    </Base>
+  ),
+
   DPadCross: (p: IconProps) => (
     <Base {...p}>
       <Path d="M9 3.5 H15 V9 H20.5 V15 H15 V20.5 H9 V15 H3.5 V9 H9 Z" />

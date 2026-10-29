@@ -34,11 +34,11 @@
     "plugins": [
       "expo-dev-client"
     ],
+    "owner": "erimusa11",
     "extra": {
       "eas": {
-        "projectId": "851d339a-e6cd-4c07-a5ad-4e95cb5adcb3"
+        "projectId": "bfbf065c-8987-4e72-aca6-556bf8376e86"
       }
-    },
-    "owner": "dilavermusa.9"
+    }
   }
 }

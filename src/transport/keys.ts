@@ -40,6 +40,21 @@ export const KEY = {
 
   CHANNEL_UP: 166,
   CHANNEL_DOWN: 167,
+  /** Jumps back to the channel watched before this one. */
+  LAST_CHANNEL: 229,
+
+  // Digits tune a channel while the TV's own Live TV app is on screen.
+  // KEYCODE_0..KEYCODE_9 are contiguous, so NUM_0 + n is digit n.
+  NUM_0: 7,
+  NUM_1: 8,
+  NUM_2: 9,
+  NUM_3: 10,
+  NUM_4: 11,
+  NUM_5: 12,
+  NUM_6: 13,
+  NUM_7: 14,
+  NUM_8: 15,
+  NUM_9: 16,
 
   MEDIA_PLAY_PAUSE: 85,
   MEDIA_STOP: 86,

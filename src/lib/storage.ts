@@ -69,8 +69,8 @@ export async function loadLastDevice(): Promise<TvDevice | null> {
 const PREFS_KEY = 'remotetv.prefs';
 
 export type Prefs = {
-  /** Which navigation surface the remote tab shows. */
-  navMode: 'dpad' | 'touchpad';
+  /** Which surface the remote tab shows in the middle: navigation or digits. */
+  navMode: 'dpad' | 'touchpad' | 'numpad';
 };
 
 const DEFAULT_PREFS: Prefs = { navMode: 'dpad' };

@@ -123,6 +123,11 @@ export function RemoteProvider({ children }: { children: React.ReactNode }) {
       for (const wait of RECONNECT_DELAYS_MS) {
         await delay(wait);
         if (session.current !== device) return;
+        // A phone in a pocket must not snatch the TV back from the one in
+        // someone's hand, and its retries would only fail on frozen Wi-Fi and
+        // drop the session for good. Stay "reconnecting"; the AppState
+        // listener below picks it up again when the app is opened.
+        if (AppState.currentState === 'background') return;
         try {
           const fresh = await withCurrentAddress(device);
           if (session.current !== device) return;

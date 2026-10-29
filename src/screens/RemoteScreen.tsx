@@ -19,6 +19,7 @@ import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-nativ
 import { DPad } from '../components/DPad';
 import { Icon } from '../components/Icons';
 import { LogoMark } from '../components/Logo';
+import { NumberPad } from '../components/NumberPad';
 import { RemoteButton } from '../components/RemoteButton';
 import { Touchpad } from '../components/Touchpad';
 import { VolumeHud } from '../components/VolumeHud';
@@ -187,7 +188,6 @@ function RemotePane() {
   const { press, prefs, setPrefs, state } = useRemote();
   const { width } = useWindowDimensions();
   const navSize = Math.min(280, width - spacing(16));
-  const touchpad = prefs.navMode === 'touchpad';
 
   return (
     <ScrollView contentContainerStyle={styles.remoteScroll} showsVerticalScrollIndicator={false}>
@@ -231,14 +231,22 @@ function RemotePane() {
           options={[
             { value: 'dpad', label: 'D-pad', icon: (c) => <Icon.DPadCross size={15} color={c} weight={2.2} /> },
             { value: 'touchpad', label: 'Touchpad', icon: (c) => <Icon.Touchpad size={15} color={c} weight={2.2} /> },
+            { value: 'numpad', label: '123', icon: (c) => <Icon.Numpad size={15} color={c} /> },
           ]}
         />
-        {touchpad ? (
+        {prefs.navMode === 'touchpad' ? (
           <Touchpad
             width={width - spacing(10)}
             height={navSize}
             onMove={(d) => press(SECTOR_KEY[d])}
             onSelect={() => press(KEY.DPAD_CENTER)}
+          />
+        ) : prefs.navMode === 'numpad' ? (
+          <NumberPad
+            size={navSize}
+            onDigit={(n) => press(KEY.NUM_0 + n)}
+            onLast={() => press(KEY.LAST_CHANNEL)}
+            onEnter={() => press(KEY.DPAD_CENTER)}
           />
         ) : (
           <DPad size={navSize} onPress={(sector) => press(SECTOR_KEY[sector])} />
